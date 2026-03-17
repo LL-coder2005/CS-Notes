@@ -77,16 +77,43 @@ DHCP为客户端服务器模式
 
 ### 5. DNS报文结构与重要标志
 
-- 报文组成：Header（12字节） + Question + Answer + Authority + Additional
-- 关键头部标志：
-  - QR：0 查询，1 响应
-  - Opcode：0 标准查询
-  - AA：权威回答（服务器回答包含权威记录）
-  - TC：截断（UDP数据太长，需要TCP重试）
-  - RD：递归查询请求（客户端发）
-  - RA：递归可用（服务器告知支持）
-  - RCODE：返回码（0 NOERROR、2 SERVFAIL、3 NXDOMAIN等）
-- ID：查询与响应匹配标识，防止重放/错配
+- DNS报文分为两部分：头部（Header）和可变长度的四个区域。
+
+1. Header（固定12字节）：
+   - ID（16位）: 查询/响应匹配号（客户端生成，响应返回相同ID）
+   - 标志位（16位）：
+     - QR（1位）：0=查询，1=响应
+     - Opcode（4位）：0=标准查询（QUERY）、1=反向查询（IQUERY）等
+     - AA（1位）：权威回答（只在响应时有效）
+     - TC（1位）：截断（UDP返回报文长度大于限制需TCP重试）
+     - RD（1位）：递归请求（客户端要求DNS服务器递归查询）
+     - RA（1位）：递归可用（服务器支持递归）
+     - Z（3位）：保留，通常为0；AD、CD 等在扩展场景中使用
+     - RCODE（4位）：返回码（0=NOERROR、2=SERVFAIL、3=NXDOMAIN、5=REFUSED等）
+   - 计数字段（各16位）：Qdcount、Ancount、Nscount、Arcount，分别表示 Question、Answer、Authority、Additional 的记录条数。
+
+2. Question（查询区）：包含域名、类型（QTYPE）、类（QCLASS）
+
+3. Answer（回答区）：包含与查询匹配的资源记录，列出IP、别名等
+
+4. Authority（权威区）：返回域名的权威名称服务器信息（如NS记录）
+
+5. Additional（附加区）：补充额外信息（如A记录、AAAA记录），加速解析
+
+- 常见记录：
+  - A/AAAA：地址记录
+  - CNAME：别名
+  - NS：名称服务器
+  - MX：邮件交换
+  - SOA：起始授权
+  - TXT、SRV等
+
+- 重点：
+  - `ID`用来绑定请求与响应
+  - `RD=1` 表示请求递归解析； `RA=1` 表示服务器支持递归
+  - `TC=1`说明UDP能容纳的数据不足；客户端主机可重试TCP
+  - `RCODE=3`说明域名不存在（NXDOMAIN）
+
 
 ### 6. 缓存与TTL（必须掌握）
 
@@ -109,12 +136,6 @@ DHCP为客户端服务器模式
 ### 8. 高可用与运维
 
 - 多权威DNS推荐：冗余、跨站点部署、避免单点故障、负载均衡、地理就近
-- 常见诊断：
-  - `dig @server domain type +trace +dnssec`（递归路径、DNSSEC验证、指定DNS服务器）
-  - `nslookup`（交互式、服务器切换）
-  - `host -t A domain`（简单直接）
-  - `dig +short`（只输出ip）
-  - `dig @8.8.8.8 www.example.com A`
 
 ### 9. 典型流程示例（记忆重点）
 
